@@ -1,5 +1,11 @@
 # AGENTS.md
 
+## Agent Instructions
+
+Always invoke the `write-clean-functions` skill before writing, creating, editing, or refactoring any function.
+
+## Content
+
 DIALX course repo: 13 independent Python tasks (`t1_llm_api` … `t13_final_task`) that build AI apps directly on vendor APIs (OpenAI/Anthropic/Gemini). It is a learning repo, not a shipped product — there are **no tests, no linter config, no CI**. Each task ships as a README + code with `TODO` markers; the README for the task you're working on is the spec and the source of truth.
 
 ## Running code
