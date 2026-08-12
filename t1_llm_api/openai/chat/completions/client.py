@@ -29,12 +29,14 @@ class OpenAIClient(BaseOpenAIClient):
             system_prompt (str): The system message to guide the model's behavior.
             api_key (str): The OpenAI API key for authentication.
         """
-        #TODO:
-        # Call to __init__ of super class
-        # Add OpenAI and AsyncOpenAI clients https://github.com/openai/openai-python?tab=readme-ov-file#usage
-        # (In readme you can find samples with both of these clients)
-        # Useful link with request/response samples https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create
-        raise NotImplementedError
+        super().__init__(
+            endpoint=endpoint,
+            model_name=model_name,
+            system_prompt=system_prompt,
+            api_key=api_key,
+        )
+        self._client = OpenAI(api_key=api_key)
+        self._async_client = AsyncOpenAI(api_key=api_key)
 
     def response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -51,12 +53,12 @@ class OpenAIClient(BaseOpenAIClient):
             The system prompt is automatically prepended to the messages.
             The response is printed to stdout before being returned.
         """
-        #TODO:
-        # - Prepare message history with System prompt
-        # - Call client
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        request = self._build_request(messages, **kwargs)
+        completion = self._client.chat.completions.create(**request)
+        content = self._extract_content(completion)
+
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -76,10 +78,40 @@ class OpenAIClient(BaseOpenAIClient):
             The system prompt is automatically prepended to the messages.
             Each token is printed to stdout as it arrives for real-time display.
         """
-        #TODO:
-        # - Prepare message history with System prompt
-        # - Call client with streaming mode
-        # - Handle stream with chunks
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        request = self._build_request(messages, **kwargs)
+        request["stream"] = True
+        stream = await self._async_client.chat.completions.create(**request)
+
+        content_parts = []
+        async for chunk in stream:
+            content = chunk.choices[0].delta.content
+            if content:
+                print(content, end="", flush=True)
+                content_parts.append(content)
+
+        print()
+        return Message(role=Role.ASSISTANT, content="".join(content_parts))
+
+    def _build_request(self, messages: list[Message], **kwargs) -> dict:
+        """Build the Chat Completions request payload."""
+        request_messages = [
+            Message(
+                role=Role.SYSTEM,
+                content=self._system_prompt,
+            ),
+            *messages,
+        ]
+
+        return {
+            "model": self._model_name,
+            "messages": [message.to_dict() for message in request_messages],
+            **kwargs,
+        }
+
+    @staticmethod
+    def _extract_content(completion) -> str:
+        """Extract assistant text from a non-streaming completion."""
+        if not completion.choices:
+            raise ValueError("No choices have been present in the response")
+
+        return completion.choices[0].message.content or ""

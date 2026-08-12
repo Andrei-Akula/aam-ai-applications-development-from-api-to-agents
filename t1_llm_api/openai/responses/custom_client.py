@@ -1,4 +1,6 @@
 import json
+from collections.abc import AsyncIterator
+
 import aiohttp
 import requests
 
@@ -35,15 +37,17 @@ class CustomOpenAIResponsesClient(BaseOpenAIClient):
             Uses the Responses API format with 'instructions' and 'input' parameters.
             The response is printed to stdout before being returned.
         """
-        #TODO:
-        # https://developers.openai.com/api/docs/guides/text?lang=curl
-        # - Prepare headers with authorization and content type
-        # - Prepare input messages
-        # - Execute post request to AI API (use `requests`)
-        # - Parse response
-        # - Print response to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        payload = self._build_payload(messages, **kwargs)
+        response = requests.post(
+            self._endpoint,
+            headers=self._build_headers(),
+            json=payload,
+        )
+        response.raise_for_status()
+
+        content = self._extract_content(response.json())
+        print(content)
+        return Message(role=Role.ASSISTANT, content=content)
 
     async def stream_response(self, messages: list[Message], **kwargs) -> Message:
         """
@@ -64,13 +68,91 @@ class CustomOpenAIResponsesClient(BaseOpenAIClient):
             Listens for 'response.output_text.delta' events to build the response.
             Each line with "event: " specifies the event type, followed by "data: " with the payload.
         """
-        #TODO:
-        # https://developers.openai.com/api/docs/guides/text?lang=curl
-        # - Prepare headers with authorization and content type
-        # - Prepare input messages
-        # - Execute post request to AI API (use `aiohttp`)
-        # - Handle stream with events
-        # - Parse response
-        # - Print chunks to console
-        # - Return ASSISTANT message
-        raise NotImplementedError
+        payload = self._build_payload(messages, **kwargs)
+        payload["stream"] = True
+
+        content_parts: list[str] = []
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                self._endpoint,
+                headers=self._build_headers(),
+                json=payload,
+            ) as response:
+                response.raise_for_status()
+                async for event_type, data in self._iter_sse_events(response):
+                    if event_type == "response.output_text.delta":
+                        delta = self._extract_stream_delta(data)
+                        if delta:
+                            print(delta, end="", flush=True)
+                            content_parts.append(delta)
+                    elif event_type in {"response.completed", "response.failed"}:
+                        break
+
+        print()
+        return Message(role=Role.ASSISTANT, content="".join(content_parts))
+
+    def _build_headers(self) -> dict[str, str]:
+        """Build headers required by the OpenAI Responses API."""
+        return {
+            "Authorization": self._api_key,
+            "Content-Type": "application/json",
+        }
+
+    def _build_payload(self, messages: list[Message], **kwargs) -> dict:
+        """Build a Responses API request payload."""
+        return {
+            "model": self._model_name,
+            "instructions": self._system_prompt,
+            "input": [message.to_dict() for message in messages],
+            **kwargs,
+        }
+
+    @staticmethod
+    def _extract_content(response: dict) -> str:
+        """Extract assistant text from a non-streaming Responses API response."""
+        output_text = response.get("output_text")
+        if isinstance(output_text, str) and output_text:
+            return output_text
+
+        content_parts = [
+            content.get("text", "")
+            for output_item in response.get("output", [])
+            for content in output_item.get("content", [])
+            if content.get("type") == "output_text"
+        ]
+        content = "".join(content_parts)
+        if not content:
+            raise ValueError("No output text has been present in the response")
+
+        return content
+
+    @staticmethod
+    def _extract_stream_delta(data: str) -> str:
+        """Extract text from a Responses API output-text delta event."""
+        return json.loads(data).get("delta") or ""
+
+    @staticmethod
+    async def _iter_sse_events(
+        response: aiohttp.ClientResponse,
+    ) -> AsyncIterator[tuple[str, str]]:
+        """Yield event type and data pairs from a Responses API SSE stream."""
+        event_type = ""
+        data_lines: list[str] = []
+
+        async for raw_line in response.content:
+            line = raw_line.decode("utf-8").rstrip("\r\n")
+
+            if not line:
+                if event_type and data_lines:
+                    yield event_type, "\n".join(data_lines)
+                event_type = ""
+                data_lines = []
+                continue
+
+            if line.startswith("event:"):
+                event_type = line.removeprefix("event:").strip()
+            elif line.startswith("data:"):
+                data_lines.append(line.removeprefix("data:").strip())
+
+        if event_type and data_lines:
+            yield event_type, "\n".join(data_lines)

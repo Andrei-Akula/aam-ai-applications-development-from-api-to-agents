@@ -54,9 +54,11 @@ end, when you do use frameworks, you'll understand exactly what's happening unde
 - **Postman** (for testing API calls)
 - **Docker** with Docker Compose
 - **API Keys** to work with different models (you will need to pay ~5-10$ credits):
-  - **OpenAI API Key** (we will be primarily working with OpenAI models). [Generate it here](https://platform.openai.com/settings/organization/api-keys) and set up as environment variable with name `OPENAI_API_KEY`
-  - **Anthropic API Key** [Generate it here](https://platform.claude.com/settings/keys) and set up as environment variable with name `ANTHROPIC_API_KEY`
-  - **Gemini API Key** [Generate it here](https://aistudio.google.com/app/api-keys) and set up as environment variable with name `GEMINI_API_KEY`
+  - **OpenAI API Key** (we will be primarily working with OpenAI models). [Generate it here](https://platform.openai.com/settings/organization/api-keys) and set it as `OPENAI_API_KEY` in the repository root `.env` file
+  - **Anthropic API Key** [Generate it here](https://platform.claude.com/settings/keys) and set it as `ANTHROPIC_API_KEY` in the repository root `.env` file
+  - **Gemini API Key** [Generate it here](https://aistudio.google.com/app/api-keys) and set it as `GEMINI_API_KEY` in the repository root `.env` file
+
+Copy `.env.example` to `.env` and replace the empty values with your keys. The shared `commons.constants` module loads `.env` automatically when it is imported. Never commit `.env`.
 
 ---
 
@@ -93,4 +95,3 @@ pip install -r requirements.txt
 ```
 
 ---
-
