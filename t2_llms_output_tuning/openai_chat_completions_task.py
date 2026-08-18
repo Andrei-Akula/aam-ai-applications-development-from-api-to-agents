@@ -1,6 +1,11 @@
 from t2_llms_output_tuning._clients.openai_chat_completions_client import OpenAIChatCompletionsClient
 from t2_llms_output_tuning._main import run
 
+RUN_OPTIONS = {
+    "print_request": True,
+    "print_only_content": False,
+}
+
 # TODO 1: n — number of completions to generate per request. Default: 1
 #  ⚠️ Note: NOT available in Responses API
 #  Query: "Give me a name for a coffee shop"
@@ -55,10 +60,119 @@ from t2_llms_output_tuning._main import run
 #  Query: "How many r's are in the word strawberry?"
 #  Try: reasoning_effort="low" vs reasoning_effort="high"
 
-run(
-    client=OpenAIChatCompletionsClient(model_name='gpt-5.2'),
-    print_request=True, # Switch to False if you do not want to see the request in console
-    print_only_content=False, # Switch to True if you want to see only content from response
+GPT_5_NANO_REQUESTS = [
+    # {
+    #     "user_input": "Give me a name for a coffee shop",
+    #     "n": 3,
+    # },
+    {
+        "user_input": "Explain quantum computing",
+        "max_completion_tokens": 50,
+    },
+    {
+        "user_input": "Explain quantum computing",
+        "max_completion_tokens": 2048,
+    },
+    {
+        "user_input": "How many r's are in the word strawberry?",
+        "reasoning_effort": "low",
+    },
+    {
+        "user_input": "How many r's are in the word strawberry?",
+        "reasoning_effort": "high",
+    },
+]
 
+GPT_5_2_REQUESTS = [
+    {
+        "user_input": "Why white is white?",
+        "temperature": 0.0,
+    },
+    {
+        "user_input": "Why white is white?",
+        "temperature": 2.0,
+    },
+        {
+        "user_input": "List 5 alternative uses for a paperclip",
+        "top_p": 0.1,
+    },
+    {
+        "user_input": "List 5 alternative uses for a paperclip",
+        "top_p": 0.9,
+    },
+    {
+        "user_input": "List 3 programming languages with their year of creation",
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "languages",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "languages": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "year": {"type": "integer"},
+                                },
+                                "required": ["name", "year"],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": ["languages"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+    },
+]
 
-)
+GPT_4O_REQUESTS = [
+    {
+        "user_input": "Count from 1 to 20, comma separated",
+        "stop": ["5"],
+    },
+    {
+        "user_input": "Write a paragraph about the ocean",
+        "frequency_penalty": 0.0,
+    },
+    {
+        "user_input": "Write a paragraph about the ocean",
+        "frequency_penalty": 1.5,
+    },
+    {
+        "user_input": "Write a paragraph about the ocean",
+        "presence_penalty": 0.0,
+    },
+    {
+        "user_input": "Write a paragraph about the ocean",
+        "presence_penalty": 1.5,
+    },
+    {
+        "user_input": "Give me a name for a coffee shop",
+        "seed": 42,
+    },
+    {
+        "user_input": "Give me a name for a coffee shop",
+        "seed": 42,
+    },
+]
+
+REQUESTS_BY_MODEL = {
+    "gpt-5-nano": GPT_5_NANO_REQUESTS,
+    "gpt-5.2": GPT_5_2_REQUESTS,
+    "gpt-4o": GPT_4O_REQUESTS,
+}
+
+for model_name, request_options in REQUESTS_BY_MODEL.items():
+    client = OpenAIChatCompletionsClient(model_name=model_name)
+    for request_kwargs in request_options:
+        run(
+            client=client,
+            **RUN_OPTIONS,
+            **request_kwargs,
+        )
